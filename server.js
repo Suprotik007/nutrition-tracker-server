@@ -9,14 +9,17 @@ app.use(express.json());
 app.use(cors());
 
 // importing routes
+
 const addedFoodsRouter = require('./routes/addedFoods');
 const usersRoutes = require("./routes/users");
+
 
 connectDB()
   .then(() => {
 
     app.use('/addedFoods', addedFoodsRouter);
     app.use("/users", usersRoutes);
+    
     
     app.get('/', (req, res) => {
       res.send('Hello from Nutrition-tracker server!');

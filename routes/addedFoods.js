@@ -1,13 +1,15 @@
-const express = require('express');
+
+ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db'); 
-
 router.get('/addFood', async (req, res) => {
   try {
     const db = getDb();
-      const email = req.query.email;
+     const { email } = req.query;
+    const query = { email };
+
     const foodsCollection = db.collection('addedFoods');
-    const foods = await foodsCollection.find({email}).toArray();
+    const foods = await foodsCollection.find(query).toArray();
     res.json(foods);
   } catch (err) {
     console.error('Failed to get foods', err);
@@ -15,24 +17,19 @@ router.get('/addFood', async (req, res) => {
   }
 });
 
-
 router.post('/addFood', async (req, res) => {
   try {
-   const { foodName, amount, email } = req.body;
+    const { foodName, amount, email, section } = req.body;
 
-    const newFood = { foodName, amount: Number(amount), email,createdAt: new Date() };
-    
+    // Add 'section' to the newFood document
+    const newFood = { foodName, amount: Number(amount), email, section, createdAt: new Date() };
+
     const db = getDb();
     const foodsCollection = db.collection('addedFoods');
-
     const result = await foodsCollection.insertOne(newFood);
-
-
     const insertedFood = await foodsCollection.findOne({ _id: result.insertedId });
-    console.log('POST /addFood received with body:', req.body);
+
     res.status(201).json(insertedFood);
-
-
   } catch (err) {
     console.error('Failed to add food', err);
     res.status(500).json({ error: 'Failed to add food' });
