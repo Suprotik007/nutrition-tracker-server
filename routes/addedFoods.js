@@ -1,20 +1,21 @@
-
- const express = require('express');
+const express = require('express');
 const router = express.Router();
-const { getDb } = require('../db'); 
-const axios=require('axios');
+const { getDb } = require('../db');
+const axios = require('axios');
 
-const APP_ID = process.env.NUTRITION_APP_ID;
-const API_KEY = process.env.NUTRITION_API_KEY;
+const CALORIE_NINJAS_KEY = process.env.CALORIE_NINJAS_API_KEY;
+
 
 router.get('/addFood', async (req, res) => {
   try {
+    const { email } = req.query;
     const db = getDb();
-     const { email } = req.query;
-    const query = { email };
 
-    const foodsCollection = db.collection('addedFoods');
-    const foods = await foodsCollection.find(query).toArray();
+    const foods = await db
+      .collection('addedFoods')
+      .find({ email })
+      .toArray();
+
     res.json(foods);
   } catch (err) {
     console.error('Failed to get foods', err);
@@ -22,56 +23,112 @@ router.get('/addFood', async (req, res) => {
   }
 });
 
+// addFood
+
 router.post('/addFood', async (req, res) => {
   try {
     const { foodName, amount, email, section } = req.body;
-console.log("Nutritionix Keys loaded:", !!APP_ID, !!API_KEY);
 
-// api call
-      const nutritionResponse = await axios.post(
-      'https://trackapi.nutritionix.com/v2/natural/nutrients',
+    if (!CALORIE_NINJAS_KEY) {
+      return res.status(500).json({ error: 'Nutrition API key missing' });
+    }
+
+    
+    const query = `${amount} ${foodName}`;
+
+    const nutritionResponse = await axios.get(
+      'https://api.calorieninjas.com/v1/nutrition',
       {
-        query: `${amount} grams ${foodName}`
-      },
-      {
+        params: { query },
         headers: {
-          'x-app-id': APP_ID,
-          'x-app-key': API_KEY,
-          'Content-Type': 'application/json'
+          'X-Api-Key': CALORIE_NINJAS_KEY
         }
       }
     );
-    console.log('nutritionResponse', nutritionResponse.data);
-    
-    
 
-    if (!nutritionResponse.data || !nutritionResponse.data.foods || nutritionResponse.data.foods.length === 0) {
-      return res.status(400).json({ error: 'No food data found' });}
-const foodData = nutritionResponse.data.foods[0]; 
+    const items = nutritionResponse.data.items;
 
-    // const newFood = { foodName, amount: Number(amount), email, section, createdAt: new Date() };
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'No nutrition data found' });
+    }
 
-     const newFood = {
+    const food = items[0];
+
+    const newFood = {
       foodName,
       amount: Number(amount),
       email,
       section,
-        calories: foodData.nf_calories ?? 0,
-      protein: foodData.nf_protein ?? 0,
-      fat: foodData.nf_total_fat ?? 0,
-      carbs: foodData.nf_total_carbohydrate ?? 0,
+      calories: food.calories ?? 0,
+      protein: food.protein_g ?? 0,
+      fat: food.fat_total_g ?? 0,
+      carbs: food.carbohydrates_total_g ?? 0,
       createdAt: new Date()
     };
 
     const db = getDb();
-    const foodsCollection = db.collection('addedFoods');
-    const result = await foodsCollection.insertOne(newFood);
-    const insertedFood = await foodsCollection.findOne({ _id: result.insertedId });
+    const result = await db.collection('addedFoods').insertOne(newFood);
+
+    const insertedFood = await db
+      .collection('addedFoods')
+      .findOne({ _id: result.insertedId });
 
     res.status(201).json(insertedFood);
   } catch (err) {
-    console.error('Failed to add food', err);
+    console.error('Failed to add food', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to add food' });
+  }
+});
+
+// dailySummary
+
+router.get('/daily-summary', async (req, res) => {
+  try {
+    const { email, date } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const baseDate = date ? new Date(date) : new Date();
+
+    
+    const startOfDay = new Date(baseDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(baseDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const db = getDb();
+
+    const summary = await db.collection('addedFoods').aggregate([
+      {
+        $match: {
+          email,
+          createdAt: { $gte: startOfDay, $lte: endOfDay }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalCalories: { $sum: '$calories' },
+          totalProtein: { $sum: '$protein' },
+          totalFat: { $sum: '$fat' },
+          totalCarbs: { $sum: '$carbs' },
+          itemCount: { $sum: 1 }
+        }
+      }
+    ]).toArray();
+
+    res.json(
+      summary[0] || {
+        totalCalories: 0,
+        totalProtein: 0,
+        totalFat: 0,
+        totalCarbs: 0,
+        itemCount: 0
+      }
+    );
+  } catch (err) {
+    console.error('Failed to get daily summary', err);
+    res.status(500).json({ error: 'Failed to get daily summary' });
   }
 });
 
