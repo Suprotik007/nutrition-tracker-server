@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db');
 const axios = require('axios');
-
+const { ObjectId } = require('mongodb');
 const CALORIE_NINJAS_KEY = process.env.CALORIE_NINJAS_API_KEY;
 
 
@@ -79,6 +79,38 @@ router.post('/addFood', async (req, res) => {
     res.status(500).json({ error: 'Failed to add food' });
   }
 });
+
+// delete
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const { id } = req.params;
+
+    const result = await db.collection('addedFoods').deleteOne({
+      _id: new ObjectId(id),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Food not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      deletedId: id,
+    });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete food',
+    });
+  }
+});
+
 
 // dailySummary
 
