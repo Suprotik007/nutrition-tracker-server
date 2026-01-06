@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db');
 const axios = require('axios');
 const { ObjectId } = require('mongodb');
+
 const CALORIE_NINJAS_KEY = process.env.CALORIE_NINJAS_API_KEY;
 
 
@@ -34,7 +35,9 @@ router.post('/addFood', async (req, res) => {
     }
 
     
-    const query = `${amount} ${foodName}`;
+    const query = `${amount}g ${foodName}`;
+    
+
 
     const nutritionResponse = await axios.get(
       'https://api.calorieninjas.com/v1/nutrition',
@@ -108,9 +111,7 @@ router.delete('/:id', async (req, res) => {
       success: false,
       message: 'Failed to delete food',
     });
-  }
-});
-
+  }});
 
 // dailySummary
 
