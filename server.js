@@ -12,6 +12,9 @@ app.use(cors());
 
 const addedFoodsRouter = require('./routes/addedFoods');
 const usersRoutes = require("./routes/users");
+const bmiRoutes = require('./routes/BMIrecord')
+
+
 
 
 connectDB()
@@ -19,8 +22,9 @@ connectDB()
 
     app.use('/addedFoods', addedFoodsRouter);
     app.use("/users", usersRoutes);
-    
-    
+    app.use('/BMIrecord', bmiRoutes);
+
+
     app.get('/', (req, res) => {
       res.send('Hello from Nutrition-tracker server!');
     });
